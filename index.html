@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LapSync F1 — Rastreamento de Voltas em Tempo Real</title>
+
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Barlow+Condensed:wght@300;400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --red:     #e8001d;
+      --red-dim: #a0001a;
+      --green:   #00e676;
+      --gold:    #ffd600;
+      --dark:    #070708;
+      --panel:   #0e0e10;
+      --border:  #1e1e22;
+      --text:    #c8c8d0;
+      --white:   #f0f0f5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.05rem;
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--dark); }
+    ::-webkit-scrollbar-thumb { background: var(--red); border-radius: 3px; }
+
+    h1, h2, h3, .mono { font-family: 'Orbitron', monospace; }
+    .data-font { font-family: 'Share Tech Mono', monospace; }
+
+    /* ─── NAVBAR ─── */
+    .navbar-custom {
+      background: rgba(7,7,8,.97);
+      border-bottom: 2px solid var(--red);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .navbar-brand span { color: var(--red); }
+    .nav-link { color: var(--text) !important; letter-spacing: .08em; font-size: .85rem; }
+    .nav-link:hover { color: var(--red) !important; }
+    .btn-red {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      font-family: 'Orbitron', monospace;
+      font-size: .75rem;
+      letter-spacing: .12em;
+      padding: .4rem 1.1rem;
+      transition: background .2s;
+    }
+    .btn-red:hover { background: var(--red-dim); color: #fff; }
+
+    /* ─── HERO ─── */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      background: var(--dark);
+    }
+    #hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(232,0,29,.2) 0%, transparent 55%),
+        linear-gradient(to bottom, transparent 40%, var(--dark) 100%);
+      z-index: 1;
+    }
+    .hero-video-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: .22;
+      z-index: 0;
+    }
+    .hero-content { position: relative; z-index: 2; }
+
+    .hero-tag {
+      display: inline-block;
+      background: var(--red);
+      color: #fff;
+      font-size: .7rem;
+      letter-spacing: .2em;
+      padding: .25rem .85rem;
+      margin-bottom: 1.2rem;
+      clip-path: polygon(0 0, 100% 0, 94% 100%, 0 100%);
+    }
+    h1.display-title {
+      font-size: clamp(2.8rem, 8vw, 6rem);
+      font-weight: 900;
+      line-height: .95;
+      color: var(--white);
+      text-transform: uppercase;
+    }
+    h1.display-title span { color: var(--red); }
+
+    .hero-sub {
+      font-size: 1.2rem;
+      font-weight: 300;
+      color: var(--text);
+      max-width: 540px;
+      line-height: 1.6;
+    }
+
+    .ticker-wrap {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      z-index: 2;
+      background: var(--red);
+      overflow: hidden;
+      white-space: nowrap;
+      padding: .35rem 0;
+    }
+    .ticker-inner {
+      display: inline-block;
+      animation: ticker 32s linear infinite;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .12em;
+      color: #fff;
+    }
+    @keyframes ticker {
+      0% { transform: translateX(100vw); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* ─── SECTIONS ─── */
+    section { padding: 5rem 0; }
+    .section-label {
+      font-size: .7rem;
+      letter-spacing: .25em;
+      color: var(--red);
+      text-transform: uppercase;
+      margin-bottom: .4rem;
+    }
+    h2.section-title {
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      color: var(--white);
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    /* ─── PANELS ─── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--red);
+    }
+    .feature-icon { font-size: 2rem; color: var(--red); }
+    h3.feature-title {
+      font-size: 1rem;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-top: .6rem;
+    }
+
+    /* ─── LIVE BADGE ─── */
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      border: 1px solid var(--red);
+      color: var(--red);
+      font-size: .7rem;
+      letter-spacing: .15em;
+      padding: .3rem .8rem;
+      transition: all .3s;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ─── LAP TABLE ─── */
+    #lap-section { background: var(--panel); }
+    .lap-table th {
+      font-family: 'Orbitron', monospace;
+      font-size: .68rem;
+      letter-spacing: .14em;
+      color: var(--red);
+      border-bottom: 1px solid var(--red);
+      background: var(--dark);
+      padding: .6rem 1rem;
+    }
+    .lap-table td {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .95rem;
+      color: var(--text);
+      border-color: var(--border);
+      padding: .55rem 1rem;
+    }
+    .lap-table tbody tr:hover td { background: rgba(232,0,29,.06); }
+    .lap-table .fastest td { color: var(--green) !important; background: rgba(0,230,118,.06); }
+    .lap-table .last-row td { animation: rowIn .4s ease; }
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    #status-bar {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .8rem;
+      padding: .55rem 1rem;
+      background: var(--dark);
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      transition: all .3s;
+    }
+    #status-bar.live-active { color: var(--green); border-top-color: var(--green); }
+
+    /* ─── AUDIO ─── */
+    .audio-wrap {
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--gold);
+      padding: 1rem 1.2rem;
+      margin-top: 2rem;
+    }
+    audio { width: 100%; accent-color: var(--red); }
+    .audio-label { font-size: .7rem; letter-spacing: .15em; color: var(--gold); margin-bottom: .5rem; }
+
+    /* ─── TRACK IMAGE ─── */
+    .track-img-wrap { position: relative; overflow: hidden; border: 1px solid var(--border); }
+    .track-img-wrap img {
+      width: 100%;
+      object-fit: cover;
+      filter: saturate(.55) contrast(1.15);
+      transition: filter .45s;
+      display: block;
+    }
+    .track-img-wrap:hover img { filter: saturate(1) contrast(1); }
+    .track-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 1.2rem;
+      background: linear-gradient(to top, rgba(7,7,8,.92), transparent);
+    }
+
+    /* ─── STEPS ─── */
+    .step-number {
+      font-family: 'Orbitron', monospace;
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: var(--red);
+      opacity: .22;
+      line-height: 1;
+      min-width: 60px;
+    }
+
+    /* ─── EXT LINKS ─── */
+    .ext-link-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--dark);
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .2s, color .2s;
+    }
+    .ext-link-card:hover { border-color: var(--red); color: var(--white); }
+    .ext-link-card .lk-icon { font-size: 1.4rem; color: var(--red); }
+
+    /* ─── FOOTER ─── */
+    footer {
+      background: var(--panel);
+      border-top: 2px solid var(--red);
+      padding: 3rem 0;
+      font-size: .83rem;
+    }
+    footer a { color: var(--red); text-decoration: none; }
+    footer a:hover { color: var(--gold); }
+    .sep { border-color: var(--border); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ NAVBAR ══════════════ -->
+<nav class="navbar navbar-expand-lg navbar-custom px-3">
+  <a class="navbar-brand mono fw-bold text-white fs-5" href="#">
+    LAP<span>SYNC</span>
+  </a>
+  <button class="navbar-toggler border-secondary" type="button"
+          data-bs-toggle="collapse" data-bs-target="#mainNav">
+    <i class="bi bi-list text-white fs-4"></i>
+  </button>
+  <div class="collapse navbar-collapse" id="mainNav">
+    <ul class="navbar-nav ms-auto align-items-center gap-3 py-2">
+      <li class="nav-item"><a class="nav-link" href="#funcionalidades">Funcionalidades</a></li>
+      <li class="nav-item"><a class="nav-link" href="#ao-vivo">Ao Vivo</a></li>
+      <li class="nav-item"><a class="nav-link" href="#pista">Pista</a></li>
+      <li class="nav-item"><a class="nav-link" href="#links">Links</a></li>
+      <li class="nav-item ms-2">
+        <button class="btn btn-red" onclick="toggleLiveMode()">
+          <i class="bi bi-broadcast me-1"></i> CONECTAR
+        </button>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+
+<!-- ══════════════ HERO ══════════════ -->
+<section id="hero">
+  <video class="hero-video-bg" autoplay muted loop playsinline
+         poster="https://images.unsplash.com/photo-1541447271487-09612b3f49f7?w=1600&q=80">
+    <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4"/>
+  </video>
+
+  <div class="container hero-content py-5">
+    <div class="row align-items-center gy-5">
+
+      <!-- ── Texto principal ── -->
+      <div class="col-lg-7">
+        <div class="hero-tag">TELEMETRIA EM TEMPO REAL</div>
+
+        <!-- H1 -->
+        <h1 class="display-title mb-4">
+          CADA<br/><span>VOLTA</span><br/>IMPORTA
+        </h1>
+
+        <p class="hero-sub mb-4">
+          LapSync conecta seus módulos de pista via <strong class="text-white">API REST</strong>
+          e <strong class="text-white">WebSocket</strong>, registrando automaticamente tempos de volta,
+          setores e telemetria — tudo sincronizado na tela em milissegundos.
+        </p>
+
+        <div class="d-flex flex-wrap gap-3">
+          <button class="btn btn-red px-4 py-2" onclick="toggleLiveMode()">
+            <i class="bi bi-play-fill me-1"></i> INICIAR SESSÃO
+          </button>
+          <a href="#ao-vivo" class="btn btn-outline-secondary px-4 py-2"
+             style="font-family:'Orbitron',monospace;font-size:.75rem;letter-spacing:.1em;color:var(--text);">
+            VER DEMO
+          </a>
+        </div>
+
+        <!-- ELEMENTO AUDIO -->
+        <div class="audio-wrap">
+          <div class="audio-label">
+            <i class="bi bi-soundwave me-1"></i> RÁDIO DA EQUIPE — VOLTA RÁPIDA
+          </div>
+          <audio controls>
+            <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"/>
+            Seu navegador não suporta o elemento de áudio HTML5.
+          </audio>
+        </div>
+      </div>
+
+      <!-- ── Painel de dados ── -->
+      <div class="col-lg-5">
+        <div class="panel p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="section-label mb-0">SESSÃO ATUAL</span>
+            <div class="live-badge"><div class="live-dot"></div> AO VIVO</div>
+          </div>
+          <div class="data-font" id="hero-time"
+               style="font-size:3.6rem;color:var(--white);line-height:1;">1:28.341</div>
+          <div style="font-size:.8rem;letter-spacing:.12em;color:var(--green);">
+            ▼ VOLTA MAIS RÁPIDA
+          </div>
+          <hr class="sep my-3"/>
+          <div class="row text-center g-2">
+            <div class="col-4">
+              <div style="font-size:.65rem;letter-spacing:.14em;color:var(--text);">SETOR 1</div>
+              <div class="data-font" style="color:var(--green);">28.114</div>
+            </div>
+            <div class="col-4">
+              <div style="font-size:.65rem;letter-spacing:.14em;color:var(--text);">SETOR 2</div>
+              <div class="data-font" style="color:var(--gold);">31.982</div>
+            </div>
+            <div class="col-4">
+              <div style="font-size:.65rem;letter-spacing:.14em;color:var(--text);">SETOR 3</div>
+              <div class="data-font" style="color:var(--white);">28.245</div>
+            </div>
+          </div>
+          <hr class="sep my-3"/>
+          <div class="d-flex justify-content-between">
+            <span style="font-size:.75rem;letter-spacing:.1em;">PILOTO</span>
+            <span class="data-font" style="color:var(--white);">VER — #1</span>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <span style="font-size:.75rem;letter-spacing:.1em;">VOLTA</span>
+            <span class="data-font" style="color:var(--white);" id="hero-lap">12 / 57</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker-wrap">
+    <div class="ticker-inner">
+      &nbsp;&nbsp;● VER +0.000 &nbsp;|&nbsp; HAM +0.312 &nbsp;|&nbsp; LEC +0.581 &nbsp;|&nbsp;
+      NOR +0.744 &nbsp;|&nbsp; SAI +1.002 &nbsp;|&nbsp; RUS +1.228 &nbsp;|&nbsp;
+      PIA +1.451 &nbsp;|&nbsp; ALO +1.890 &nbsp;|&nbsp; STR +2.100 &nbsp;|&nbsp;
+      WEBSOCKET CONECTADO · MÓDULOS ATIVOS: 3/3 &nbsp;&nbsp;●&nbsp;&nbsp;
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════ FUNCIONALIDADES ══════════════ -->
+<section id="funcionalidades">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">TECNOLOGIA</div>
+      <!-- H2 -->
+      <h2 class="section-title">Como o LapSync<br/>funciona</h2>
+      <p class="mt-3" style="max-width:560px;margin:auto;font-weight:300;">
+        Uma plataforma integrada que conecta sensores físicos na pista a uma
+        interface de tempo real — sem atraso, sem perda de dado.
+      </p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-3">
+        <div class="panel p-4 h-100">
+          <div class="feature-icon"><i class="bi bi-wifi"></i></div>
+          <!-- H3 -->
+          <h3 class="feature-title">Conexão WebSocket</h3>
+          <p style="font-size:.9rem;font-weight:300;margin-top:.5rem;">
+            Canal persistente com os módulos de pista. Latência &lt; 15 ms.
+            Reconexão automática em caso de falha de rede.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="panel p-4 h-100">
+          <div class="feature-icon"><i class="bi bi-hdd-network"></i></div>
+          <h3 class="feature-title">API REST</h3>
+          <p style="font-size:.9rem;font-weight:300;margin-top:.5rem;">
+            Endpoints documentados para histórico, exportação CSV
+            e integração com sistemas externos da equipe.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="panel p-4 h-100">
+          <div class="feature-icon"><i class="bi bi-stopwatch"></i></div>
+          <h3 class="feature-title">Registro Automático</h3>
+          <p style="font-size:.9rem;font-weight:300;margin-top:.5rem;">
+            Detector de passagem de linha registra voltas com precisão de
+            milissegundo, sem intervenção manual do operador.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="panel p-4 h-100">
+          <div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
+          <h3 class="feature-title">Análise ao Vivo</h3>
+          <p style="font-size:.9rem;font-weight:300;margin-top:.5rem;">
+            Destaque automático de volta mais rápida, comparativo entre
+            pilotos e alerta de melhoria de setor.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════ TABELA AO VIVO ══════════════ -->
+<section id="ao-vivo" style="padding-top:0;">
+  <div id="lap-section" class="py-5">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+          <div class="section-label mb-1">TELEMETRIA</div>
+          <h2 class="section-title">Registro de Voltas</h2>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <div class="live-badge" id="connection-badge">
+            <div class="live-dot"></div> AGUARDANDO
+          </div>
+          <button class="btn btn-red btn-sm" onclick="addSimulatedLap()">
+            <i class="bi bi-plus-lg me-1"></i> SIMULAR VOLTA
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" id="live-toggle-btn"
+                  onclick="toggleLiveMode()"
+                  style="font-family:'Orbitron',monospace;font-size:.7rem;letter-spacing:.1em;color:var(--text);">
+            CONECTAR
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-borderless lap-table mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>PILOTO</th>
+              <th>VOLTA</th>
+              <th>SETOR 1</th>
+              <th>SETOR 2</th>
+              <th>SETOR 3</th>
+              <th>DELTA</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="lap-table-body">
+            <tr class="fastest">
+              <td>01</td><td>VER</td><td>1:28.341</td>
+              <td>28.114</td><td>31.982</td><td>28.245</td>
+              <td style="color:var(--green);">—</td>
+              <td><i class="bi bi-lightning-fill text-warning"></i> RÁPIDA</td>
+            </tr>
+            <tr>
+              <td>02</td><td>HAM</td><td>1:28.653</td>
+              <td>28.301</td><td>32.108</td><td>28.244</td>
+              <td style="color:var(--red);">+0.312</td>
+              <td><i class="bi bi-check-circle text-secondary"></i></td>
+            </tr>
+            <tr>
+              <td>03</td><td>LEC</td><td>1:28.922</td>
+              <td>28.450</td><td>32.201</td><td>28.271</td>
+              <td style="color:var(--red);">+0.581</td>
+              <td><i class="bi bi-check-circle text-secondary"></i></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="status-bar">
+        <i class="bi bi-circle me-2"></i>
+        <span id="status-text">Aguardando conexão com módulos da pista...</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════ PISTA + VÍDEO ══════════════ -->
+<section id="pista">
+  <div class="container">
+    <div class="row g-5 align-items-center">
+
+      <div class="col-lg-6">
+        <div class="section-label">MÓDULOS DE PISTA</div>
+        <h2 class="section-title mb-3">Infraestrutura<br/>na Pista</h2>
+        <p style="font-weight:300;line-height:1.7;">
+          Sensores ultrassônicos e infravermelhos instalados em pontos estratégicos
+          enviam sinais ao servidor central assim que o veículo cruza a linha de detecção.
+          O protocolo <strong class="text-white">WebSocket</strong> garante que cada evento
+          chegue ao painel em menos de 15 milissegundos.
+        </p>
+        <p style="font-weight:300;line-height:1.7;margin-top:1rem;">
+          A <strong class="text-white">API REST</strong> complementa o sistema para consultas
+          históricas e configuração remota dos módulos Arduino/ESP32 instalados na pista.
+        </p>
+
+        <!-- Steps -->
+        <div class="d-flex flex-column gap-3 mt-4">
+          <div class="d-flex align-items-start gap-3">
+            <div class="step-number">01</div>
+            <div>
+              <h3 style="font-size:.9rem;color:var(--white);font-family:'Orbitron',monospace;letter-spacing:.08em;">DETECTAR</h3>
+              <p style="font-size:.88rem;font-weight:300;">Sensor capta a passagem e envia pulso ao controlador.</p>
+            </div>
+          </div>
+          <div class="d-flex align-items-start gap-3">
+            <div class="step-number">02</div>
+            <div>
+              <h3 style="font-size:.9rem;color:var(--white);font-family:'Orbitron',monospace;letter-spacing:.08em;">TRANSMITIR</h3>
+              <p style="font-size:.88rem;font-weight:300;">WebSocket entrega o evento ao servidor Node.js em tempo real.</p>
+            </div>
+          </div>
+          <div class="d-flex align-items-start gap-3">
+            <div class="step-number">03</div>
+            <div>
+              <h3 style="font-size:.9rem;color:var(--white);font-family:'Orbitron',monospace;letter-spacing:.08em;">EXIBIR</h3>
+              <p style="font-size:.88rem;font-weight:300;">Painel atualiza automaticamente sem necessidade de refresh.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <!-- ELEMENTO IMAGEM -->
+        <div class="track-img-wrap mb-4">
+          <img src="https://images.unsplash.com/photo-1541447271487-09612b3f49f7?w=900&q=80"
+               alt="Carros de Fórmula 1 em alta velocidade na pista" loading="lazy"
+               style="height:280px;"/>
+          <div class="track-overlay">
+            <div class="data-font" style="font-size:.75rem;color:var(--text);">
+              CIRCUITO INTERNACIONAL — SETOR 1
+            </div>
+            <div class="data-font" style="font-size:1.4rem;color:var(--green);">
+              ● MÓDULO ATIVO
+            </div>
+          </div>
+        </div>
+
+        <!-- ELEMENTO VÍDEO (embed YouTube) -->
+        <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border:1px solid var(--border);">
+          <iframe
+            src="https://www.youtube.com/embed/n6H27AHlJ48?rel=0&modestbranding=1"
+            title="F1 — Como funciona a cronometragem oficial de Fórmula 1"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+        <div style="font-size:.7rem;color:var(--text);letter-spacing:.1em;margin-top:.5rem;">
+          <i class="bi bi-play-circle me-1" style="color:var(--red);"></i>
+          VÍDEO: COMO FUNCIONA A CRONOMETRAGEM OFICIAL DA F1
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════ LINKS EXTERNOS ══════════════ -->
+<section id="links" style="background:var(--panel);">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">RECURSOS</div>
+      <h2 class="section-title">Links &amp; Documentação</h2>
+      <p class="mt-2" style="font-weight:300;max-width:500px;margin:auto;">
+        Referências oficiais, ferramentas e APIs utilizadas no ecossistema LapSync.
+      </p>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6 col-lg-4">
+        <a href="https://www.formula1.com" target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-trophy lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">SITE OFICIAL</div>
+            <div style="color:var(--white);font-weight:600;">Formula 1</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <a href="https://developer.mozilla.org/pt-BR/docs/Web/API/WebSocket"
+           target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-code-slash lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">DOCUMENTAÇÃO</div>
+            <div style="color:var(--white);font-weight:600;">WebSocket API — MDN</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <a href="https://nodejs.org/en/docs" target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-server lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">BACKEND</div>
+            <div style="color:var(--white);font-weight:600;">Node.js Docs</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <a href="https://expressjs.com/pt-br/" target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-lightning lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">API REST</div>
+            <div style="color:var(--white);font-weight:600;">Express.js</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <a href="https://getbootstrap.com/docs/5.3" target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-bootstrap lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">INTERFACE</div>
+            <div style="color:var(--white);font-weight:600;">Bootstrap 5 Docs</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <a href="https://ergast.com/mrd/" target="_blank" rel="noopener" class="ext-link-card">
+          <i class="bi bi-database lk-icon"></i>
+          <div>
+            <div style="font-size:.72rem;letter-spacing:.12em;color:var(--text);">DADOS F1</div>
+            <div style="color:var(--white);font-weight:600;">Ergast Developer API</div>
+          </div>
+          <i class="bi bi-arrow-up-right ms-auto" style="opacity:.4;"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer>
+  <div class="container">
+    <div class="row gy-4 align-items-start">
+      <div class="col-md-4">
+        <div class="mono fw-bold text-white fs-5 mb-2">
+          LAP<span style="color:var(--red)">SYNC</span>
+        </div>
+        <p style="font-weight:300;font-size:.88rem;max-width:280px;">
+          Plataforma de cronometragem e telemetria para corridas de Fórmula 1.
+          Conectando pista e painel em tempo real.
+        </p>
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:.7rem;letter-spacing:.18em;color:var(--red);margin-bottom:.8rem;">
+          TECNOLOGIAS
+        </div>
+        <ul class="list-unstyled" style="font-size:.88rem;font-weight:300;line-height:2.1;">
+          <li>Node.js + Express</li>
+          <li>WebSocket (ws)</li>
+          <li>REST API</li>
+          <li>Bootstrap 5 (CDN)</li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:.7rem;letter-spacing:.18em;color:var(--red);margin-bottom:.8rem;">
+          NAVEGAÇÃO
+        </div>
+        <ul class="list-unstyled" style="font-size:.88rem;font-weight:300;line-height:2.1;">
+          <li><a href="#funcionalidades">Funcionalidades</a></li>
+          <li><a href="#ao-vivo">Tabela ao Vivo</a></li>
+          <li><a href="#pista">Módulos de Pista</a></li>
+          <li><a href="#links">Documentação</a></li>
+        </ul>
+      </div>
+    </div>
+    <hr class="sep mt-4"/>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-3"
+         style="font-size:.78rem;opacity:.45;">
+      <span>© 2025 LapSync — Projeto IDEV · 2º Ensino Médio</span>
+      <span class="data-font">WebSocket · REST API · Telemetria F1</span>
+    </div>
+  </div>
+</footer>
+
+
+<!-- Bootstrap JS Bundle (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  /* ════════════════════════════════════════════════════
+     FUNÇÃO 1 — toggleLiveMode()
+     Altera o estado de conexão da página,
+     modificando o DOM: badge, status bar, botões,
+     e inicia/para a simulação automática de voltas.
+  ════════════════════════════════════════════════════ */
+  let isLive = false;
+  let liveInterval = null;
+
+  function toggleLiveMode() {
+    isLive = !isLive;
+
+    const badge     = document.getElementById('connection-badge');
+    const statusBar = document.getElementById('status-bar');
+    const statusTxt = document.getElementById('status-text');
+    const toggleBtn = document.getElementById('live-toggle-btn');
+
+    if (isLive) {
+      // — CONECTADO —
+      const dot = badge.querySelector('.live-dot');
+      badge.innerHTML = '<div class="live-dot" style="background:var(--green)"></div> AO VIVO';
+      badge.style.borderColor = 'var(--green)';
+      badge.style.color       = 'var(--green)';
+
+      statusBar.classList.add('live-active');
+      statusTxt.textContent =
+        '⬤  WebSocket conectado — módulos 1 / 2 / 3 ativos — recebendo dados em tempo real...';
+
+      toggleBtn.textContent       = 'DESCONECTAR';
+      toggleBtn.style.color       = 'var(--red)';
+      toggleBtn.style.borderColor = 'var(--red)';
+
+      // Simula chegada de voltas a cada 4 segundos
+      liveInterval = setInterval(addSimulatedLap, 4000);
+
+    } else {
+      // — DESCONECTADO —
+      badge.innerHTML = '<div class="live-dot" style="background:var(--red)"></div> DESCONECTADO';
+      badge.style.borderColor = 'var(--red)';
+      badge.style.color       = 'var(--red)';
+
+      statusBar.classList.remove('live-active');
+      statusTxt.textContent = '○  Conexão encerrada. Clique em CONECTAR para retomar a sessão.';
+
+      toggleBtn.textContent       = 'CONECTAR';
+      toggleBtn.style.color       = 'var(--text)';
+      toggleBtn.style.borderColor = '#6c757d';
+
+      clearInterval(liveInterval);
+    }
+  }
+
+
+  /* ════════════════════════════════════════════════════
+     FUNÇÃO 2 — addSimulatedLap()
+     Insere dinamicamente uma nova linha na tabela
+     de voltas via manipulação direta do DOM.
+     Calcula delta em relação à volta mais rápida
+     e destaca automaticamente se for nova melhor volta.
+  ════════════════════════════════════════════════════ */
+  const PILOTOS   = ['VER','HAM','LEC','NOR','SAI','RUS','PIA','ALO','STR','GAS'];
+  let lapCounter  = 4;
+  let fastestMs   = 88341; // 1:28.341 em milissegundos
+
+  function msToTime(ms) {
+    const min = Math.floor(ms / 60000);
+    const sec = Math.floor((ms % 60000) / 1000);
+    const mil = ms % 1000;
+    return `${min}:${String(sec).padStart(2,'0')}.${String(mil).padStart(3,'0')}`;
+  }
+
+  function addSimulatedLap() {
+    const tbody   = document.getElementById('lap-table-body');
+    const piloto  = PILOTOS[Math.floor(Math.random() * PILOTOS.length)];
+
+    // Tempos de setor aleatórios (ms)
+    const s1 = 27800 + Math.floor(Math.random() * 900);
+    const s2 = 31400 + Math.floor(Math.random() * 1000);
+    const s3 = 27800 + Math.floor(Math.random() * 800);
+    const total = s1 + s2 + s3;
+
+    const isFastest = total < fastestMs;
+    const delta = isFastest
+      ? '—'
+      : '+' + ((total - fastestMs) / 1000).toFixed(3);
+
+    // Se nova volta mais rápida: remove destaque anterior e atualiza hero
+    if (isFastest) {
+      fastestMs = total;
+      const prev = tbody.querySelector('.fastest');
+      if (prev) prev.classList.remove('fastest');
+      document.getElementById('hero-time').textContent = msToTime(total);
+    }
+
+    // Cria nova linha e insere no topo da tabela
+    const tr = document.createElement('tr');
+    tr.className = (isFastest ? 'fastest ' : '') + 'last-row';
+    tr.innerHTML = `
+      <td>${String(lapCounter).padStart(2,'0')}</td>
+      <td>${piloto}</td>
+      <td>${msToTime(total)}</td>
+      <td>${msToTime(s1)}</td>
+      <td>${msToTime(s2)}</td>
+      <td>${msToTime(s3)}</td>
+      <td style="color:${isFastest ? 'var(--green)' : 'var(--red)'};">${delta}</td>
+      <td>${isFastest
+        ? '<i class="bi bi-lightning-fill text-warning"></i> RÁPIDA'
+        : '<i class="bi bi-check-circle text-secondary"></i>'}</td>
+    `;
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    // Atualiza contador de volta no hero
+    document.getElementById('hero-lap').textContent = `${lapCounter} / 57`;
+    lapCounter++;
+  }
+</script>
+</body>
+</html>
